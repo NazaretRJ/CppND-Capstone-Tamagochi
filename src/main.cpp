@@ -67,7 +67,7 @@ int main() {
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
     }
 
-    std::cout << "End Main\n";
+    std::cout << "End \n";
 
     return 0;
 }

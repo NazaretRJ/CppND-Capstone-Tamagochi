@@ -4,7 +4,7 @@
 
 /* Implementation of class "MessageQueue" */
 
-
+/*
 template <typename T>
 T MessageQueue<T>::receive()
 {
@@ -25,9 +25,9 @@ void MessageQueue<T>::send(T &&msg)
     _deque.push_back(std::move(msg));
     _cond.notify_one();
 }
+*/
 
-
-int getRandomNumber(int min = 0, int max = 10)
+int getRandomNumber(int min = 0, int max = 30)
 {
     std::random_device rd; // Obtain a random seed from hardware
     std::mt19937 generator(rd()); // Seed the generator
@@ -59,17 +59,28 @@ void Tamagochi::start()
 
 void Tamagochi::updateLevels()
 {
-    int prov = getRandomNumber(0,10);
+    int prov = getRandomNumber(0,50);
 
     std::lock_guard<std::mutex> mlock(_mutex);
     if(prov % 2 == 0)
     {
-        _hungerLevel -= 10;
+        _hungerLevel += 10;
+        
+        if(_hungerLevel > _MAX_LEVEL)
+        {
+            _hungerLevel = _MAX_LEVEL;
+        }
     }
     else
     {
-        _sleepLevel -= 10;
+        _sleepLevel += 10;
+
+        if(_sleepLevel > _MAX_LEVEL)
+        {
+            _sleepLevel = _MAX_LEVEL;
+        }
     }
+    std::cout << "Status of your tamagochi, hunger: " <<  _hungerLevel << ", sleep: " << _sleepLevel << "\n";
 }
 
 
@@ -106,7 +117,7 @@ void Tamagochi::waitForAction()
 
 void Tamagochi::simulate()
 {
-    int cycleDuration = getRandomNumber(2,5) * 1000; //convert to ms
+    int cycleDuration = getRandomNumber(2,6) * 1000; //convert to ms
 
     auto startTime {std::chrono::steady_clock::now()};
     auto endTime {startTime};
@@ -124,12 +135,12 @@ void Tamagochi::simulate()
             {
                 std::lock_guard<std::mutex> mlock(_mutex);
 
-                if(_hungerLevel <= _MIN_HUNGER_LEVEL)
+                if(_hungerLevel >= _MIN_HUNGER_LEVEL)
                 {
                     msg = "Your Tamagochi is hungry.\n";
                 }
                 
-                if(_sleepLevel <= _MIN_SLEEP_LEVEL)
+                if(_sleepLevel >= _MIN_SLEEP_LEVEL)
                 {
                     msg += "Your Tamagochi is sleepy.\n";
                 }
@@ -139,7 +150,7 @@ void Tamagochi::simulate()
             std::cout << msg;
 
             startTime = endTime;
-            cycleDuration = getRandomNumber() * 1000; //convert to ms
+            cycleDuration = getRandomNumber(2,6) * 1000; //convert to ms
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -151,39 +162,49 @@ void Tamagochi::simulate()
 
 void Tamagochi::feed()
 {
-    _hungerLevel -= _HUNGER_RESTORATION_POINTS; 
+    {
+        std::lock_guard<std::mutex> mlock(_mutex);
+
+        _hungerLevel -= _HUNGER_RESTORATION_POINTS; 
+    }
+
+    std::cout << "Eating...\n";
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
     
-    std::cout << "Eating...";
-    std::this_thread::sleep_for(std::chrono::milliseconds(250));    
+    std::lock_guard<std::mutex> mlock(_mutex);    
     if (_hungerLevel  < 0)
     {
         _hungerLevel = 0;
     }
-    else if(_hungerLevel > _MIN_HUNGER_LEVEL)
+    else if(_hungerLevel >= _MIN_HUNGER_LEVEL)
     {
-        std::cout << "Your tamagochi is still hungry :( ";
+        std::cout << "Your tamagochi is still hungry :( \n";
     }
 }
 
 void Tamagochi::play()
 {
-    std::cout << "Your tamagochi is very happy! :) ";
+    std::cout << "Your tamagochi is very happy! :) \n";
 }
 
 void Tamagochi::nap()
 {
-    _sleepLevel -= _SLEEP_RESTORATION_POINTS; 
-    
-    std::cout << "sleeping...";
+    {
+        std::lock_guard<std::mutex> mlock(_mutex);
+
+        _sleepLevel -= _SLEEP_RESTORATION_POINTS; 
+    }
+    std::cout << "sleeping... \n";
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
+    std::lock_guard<std::mutex> mlock(_mutex);
     if (_sleepLevel  < 0)
     {
         _sleepLevel = 0;
     }
-    else if(_sleepLevel > _MIN_SLEEP_LEVEL)
+    else if(_sleepLevel >= _MIN_SLEEP_LEVEL)
     {
-        std::cout << "Your tamagochi is still sleepy :( ";
+        std::cout << "Your tamagochi is still sleepy :( sleepy: " << _sleepLevel << "\n";
     }
 }
 

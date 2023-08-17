@@ -21,8 +21,26 @@ class MessageQueue
 {
 public:
     MessageQueue(){};
-    void send(T&& msg);
-    T receive();
+    
+    void send(T&& msg)
+    {
+        std::lock_guard<std::mutex> mlock(_mutex);
+        _deque.push_back(std::move(msg));
+        _cond.notify_one();
+    }
+    
+    T receive()
+    {
+        std::unique_lock<std::mutex> mlock(_mutex);   
+
+        _cond.wait(mlock, [this]{return !_deque.empty();});
+
+        Actions receivedMsg = std::move(_deque.front());
+        _deque.pop_front();
+
+        return receivedMsg;
+    }
+
 private:
     std::deque<Actions> _deque;
     std::condition_variable _cond;
@@ -56,12 +74,12 @@ private:
 
     std::condition_variable _condition;
     std::mutex _mutex;
-    unsigned int _hungerLevel {0};
-    unsigned int _sleepLevel {0}; 
+    int _hungerLevel {0};
+    int _sleepLevel {0}; 
 
     // levels to consider that the pet is hungry or sleepy;
-    const unsigned int _MIN_HUNGER_LEVEL {50};
-    const unsigned int _MIN_SLEEP_LEVEL {20};
+    const unsigned int _MIN_HUNGER_LEVEL {60};
+    const unsigned int _MIN_SLEEP_LEVEL {70};
     const unsigned int _MAX_LEVEL {100};
 
     const unsigned int _HUNGER_RESTORATION_POINTS {40};
