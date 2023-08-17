@@ -27,9 +27,19 @@ void MessageQueue<T>::send(T &&msg)
 }
 
 
+int getRandomNumber(int min = 0, int max = 10)
+{
+    std::random_device rd; // Obtain a random seed from hardware
+    std::mt19937 generator(rd()); // Seed the generator
+    std::uniform_int_distribution<int> distribution(min, max); // Create a uniform distribution
+
+    return distribution(generator); // Generate and return a random number in the range [min, max]
+}
+
 /* Implementation of class "Tamagochi" */
 
-Tamagochi::Tamagochi()
+Tamagochi::Tamagochi(std::shared_ptr<MessageQueue<Actions>> &msgQueue):
+    _actionsQueue{msgQueue}
 {
     //readStatus();
 }
@@ -37,17 +47,107 @@ Tamagochi::Tamagochi()
 Tamagochi::~Tamagochi()
 {
     //writeStatus();
+    _readThread.join();
+    _simulationThread.join();
 }
+
+void Tamagochi::start()
+{
+    _readThread = std::thread(&Tamagochi::waitForAction, this);
+    _simulationThread = std::thread(&Tamagochi::simulate, this);
+}
+
+void Tamagochi::updateLevels()
+{
+    int prov = getRandomNumber(0,10);
+
+    std::lock_guard<std::mutex> mlock(_mutex);
+    if(prov % 2 == 0)
+    {
+        _hungerLevel -= 10;
+    }
+    else
+    {
+        _sleepLevel -= 10;
+    }
+}
+
 
 void Tamagochi::waitForAction()
 {
-
+    Actions act;
+    bool userStops = !_canContinue;
+    while(!userStops && _actionsQueue != nullptr)
+    {
+        act = _actionsQueue->receive();
+        switch (act) {
+            case Actions::eat:
+            {
+                feed();
+                break;
+            }
+            case Actions::nap:
+                nap();
+                break;
+            case Actions::play:
+            {
+                play();
+                break;
+            }
+            case Actions::stop:
+            {
+                userStops = true;
+                _canContinue.store(!userStops);
+                break;
+            }
+        }
+    }
 }
 
 void Tamagochi::simulate()
 {
+    int cycleDuration = getRandomNumber(2,5) * 1000; //convert to ms
 
+    auto startTime {std::chrono::steady_clock::now()};
+    auto endTime {startTime};
+    int elapsedTime {0};
+    Actions generatedAction;
+    std::string msg{""};
+    while(_canContinue)
+    {
+        elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count(); // in ms
+
+        if(elapsedTime >= cycleDuration)
+        {
+            updateLevels();
+            
+            {
+                std::lock_guard<std::mutex> mlock(_mutex);
+
+                if(_hungerLevel <= _MIN_HUNGER_LEVEL)
+                {
+                    msg = "Your Tamagochi is hungry.\n";
+                }
+                
+                if(_sleepLevel <= _MIN_SLEEP_LEVEL)
+                {
+                    msg += "Your Tamagochi is sleepy.\n";
+                }
+            }
+
+            //Warn the user
+            std::cout << msg;
+
+            startTime = endTime;
+            cycleDuration = getRandomNumber() * 1000; //convert to ms
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        endTime = std::chrono::steady_clock::now();
+    }
 }
+
 
 void Tamagochi::feed()
 {
@@ -65,7 +165,7 @@ void Tamagochi::feed()
     }
 }
 
-void Tamagochi::feed()
+void Tamagochi::play()
 {
     std::cout << "Your tamagochi is very happy! :) ";
 }
@@ -85,4 +185,9 @@ void Tamagochi::nap()
     {
         std::cout << "Your tamagochi is still sleepy :( ";
     }
+}
+
+void Tamagochi::stop()
+{
+    _canContinue.store(false);
 }

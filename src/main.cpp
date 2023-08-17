@@ -1,14 +1,24 @@
 #include <iostream>
-#include <thread>
 #include <atomic>
+#include <memory>
 
 #include "Tamagochi.h"
 
-void getUserDecission(std::atomic<bool> &canContinue)
-{
+
+int main() {
+
+    std::atomic<bool> canContinue(true);
+    
+    std::shared_ptr<MessageQueue<Actions>> actionsQueue =  std::make_shared<MessageQueue<Actions>>();
+    //MessageQueue<Actions> actionsQueue;
+
     unsigned int choice {0};
     Actions userAction{Actions::play};
     bool userStop {!canContinue};
+    bool valid {true};
+
+    Tamagochi pet(actionsQueue);
+    pet.start();
 
     while(!userStop)
     {
@@ -19,50 +29,45 @@ void getUserDecission(std::atomic<bool> &canContinue)
         switch (choice) {
             case 1:
                 userAction = Actions::eat;
+                
                 break;
             case 2:
                 userAction = Actions::nap;
+                
                 break;
             case 3:
             {
                 userAction = Actions::play;
+                
                 break;
             }
             case 4:
             {
                 userStop = true;
                 canContinue.store(!userStop);
+                userAction = Actions::stop;
+
                 break;
             }
             default:
+            {
                 std::cout << "Invalid choice" << std::endl;
+                valid = false;
+            }
+                
         }
 
-        if(!userStop)
+        if(valid)
         {
-            // send to Tamagochi
+            // send to tamagochi
+            actionsQueue->send(std::move(userAction));
         }
 
+        valid = true;
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
-    }
-
-    std::cout << "End THread\n";
-
-}
-
-int main() {
-
-    std::atomic<bool> canContinue(true);
-
-    std::thread userThread(getUserDecission, std::ref(canContinue));
-    
-    while(canContinue)
-    {
-        //std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
     std::cout << "End Main\n";
 
-    userThread.join();
     return 0;
 }
