@@ -41,6 +41,12 @@ public:
         return receivedMsg;
     }
 
+    bool isEmpty()
+    {
+        std::unique_lock<std::mutex> mlock(_mutex);
+        return _deque.empty();
+    }
+
 private:
     std::deque<Actions> _deque;
     std::condition_variable _cond;

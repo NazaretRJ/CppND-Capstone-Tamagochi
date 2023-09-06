@@ -64,6 +64,8 @@ void Tamagochi::waitForAction()
     bool userStops = !_canContinue;
     while(!userStops)
     {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
         {
             std::lock_guard<std::mutex> mlock(_msgQueueAccessMutex);
             if(_actionsQueue == nullptr)
@@ -74,7 +76,15 @@ void Tamagochi::waitForAction()
                 continue;
             }
             else{
-                act = _actionsQueue->receive();
+                if(_actionsQueue->isEmpty())
+                {
+                    continue;
+                }
+                else
+                {
+                    act = _actionsQueue->receive();
+                }
+                
             }
             
         }
