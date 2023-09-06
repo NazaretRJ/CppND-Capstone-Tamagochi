@@ -10,14 +10,14 @@ int main() {
     std::atomic<bool> canContinue(true);
     
     std::shared_ptr<MessageQueue<Actions>> actionsQueue =  std::make_shared<MessageQueue<Actions>>();
-    //MessageQueue<Actions> actionsQueue;
+    std::mutex msgQueueAccessMutex;
 
     unsigned int choice {0};
     Actions userAction{Actions::play};
     bool userStop {!canContinue};
     bool valid {true};
 
-    Tamagochi pet(actionsQueue);
+    Tamagochi pet(actionsQueue, msgQueueAccessMutex);
     pet.start();
 
     while(!userStop)
@@ -60,7 +60,11 @@ int main() {
         if(valid)
         {
             // send to tamagochi
-            actionsQueue->send(std::move(userAction));
+            {
+                std::lock_guard<std::mutex> mlock(msgQueueAccessMutex);
+                actionsQueue->send(std::move(userAction));
+            }
+            
         }
 
         valid = true;

@@ -52,15 +52,12 @@ class Tamagochi
 {
 public:
     // constructor / destructor
-    Tamagochi(std::shared_ptr<MessageQueue<Actions>> &msgQueue);
+    Tamagochi(std::shared_ptr<MessageQueue<Actions>> &msgQueue, std::mutex &accessMutex);
     ~Tamagochi();
 
     void start();
 
 private:
-
-    //void readStatus();
-    //void writeStatus();
 
     void updateLevels();
 
@@ -73,7 +70,9 @@ private:
     void stop();
 
     std::condition_variable _condition;
-    std::mutex _mutex;
+    std::mutex _playMutex;
+    std::mutex& _msgQueueAccessMutex; // lock access to _actionsQueue;
+
     int _hungerLevel {0};
     int _sleepLevel {0}; 
 
