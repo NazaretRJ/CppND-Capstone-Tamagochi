@@ -14,13 +14,12 @@ int main() {
 
     unsigned int choice {0};
     Actions userAction{Actions::play};
-    bool userStop {!canContinue};
-    bool valid {true};
+    std::atomic<bool> valid {true};
 
     Tamagochi pet(actionsQueue, msgQueueAccessMutex);
     pet.start();
 
-    while(!userStop)
+    while(canContinue)
     {
         std::cout << "Choose an action: \n";
         std::cout << "1. Feed, 2.Sleep, 3.Play, 4.Quit \n"; 
@@ -43,8 +42,7 @@ int main() {
             }
             case 4:
             {
-                userStop = true;
-                canContinue.store(!userStop);
+                canContinue.store(false);
                 userAction = Actions::stop;
 
                 break;
@@ -52,7 +50,7 @@ int main() {
             default:
             {
                 std::cout << "Invalid choice" << std::endl;
-                valid = false;
+                valid.store(false);
             }
                 
         }
@@ -67,7 +65,7 @@ int main() {
             
         }
 
-        valid = true;
+        valid.store(true);
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
     }
 

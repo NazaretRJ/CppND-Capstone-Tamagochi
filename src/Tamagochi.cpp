@@ -61,8 +61,7 @@ void Tamagochi::updateLevels()
 void Tamagochi::waitForAction()
 {
     Actions act;
-    bool userStops = !_canContinue;
-    while(!userStops)
+    while(_canContinue)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
@@ -71,8 +70,7 @@ void Tamagochi::waitForAction()
             if(_actionsQueue == nullptr)
             {
                 std::cout << "Error! The shared message queue is null \n";
-                userStops = true;
-                _canContinue.store(!userStops);
+                _canContinue.store(false);
                 continue;
             }
             else{
@@ -105,8 +103,7 @@ void Tamagochi::waitForAction()
             }
             case Actions::stop:
             {
-                userStops = true;
-                _canContinue.store(!userStops);
+                _canContinue.store(false);
                 break;
             }
         }
@@ -164,17 +161,19 @@ void Tamagochi::feed()
         std::lock_guard<std::mutex> mlock(_playMutex);
 
         _hungerLevel -= _HUNGER_RESTORATION_POINTS; 
+        
+        if (_hungerLevel  < 0)
+        {
+            _hungerLevel = 0;
+        }
     }
 
     std::cout << "Eating...\n";
     std::this_thread::sleep_for(std::chrono::milliseconds(250));
     
     std::lock_guard<std::mutex> mlock(_playMutex);    
-    if (_hungerLevel  < 0)
-    {
-        _hungerLevel = 0;
-    }
-    else if(_hungerLevel >= _MIN_HUNGER_LEVEL)
+
+    if (_hungerLevel >= _MIN_HUNGER_LEVEL)
     {
         std::cout << "Your tamagochi is still hungry :( \n";
     }
@@ -191,16 +190,17 @@ void Tamagochi::nap()
         std::lock_guard<std::mutex> mlock(_playMutex);
 
         _sleepLevel -= _SLEEP_RESTORATION_POINTS; 
+
+        if (_sleepLevel  < 0)
+        {
+            _sleepLevel = 0;
+        }
     }
     std::cout << "sleeping... \n";
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     std::lock_guard<std::mutex> mlock(_playMutex);
-    if (_sleepLevel  < 0)
-    {
-        _sleepLevel = 0;
-    }
-    else if(_sleepLevel >= _MIN_SLEEP_LEVEL)
+    if (_sleepLevel >= _MIN_SLEEP_LEVEL)
     {
         std::cout << "Your tamagochi is still sleepy :( sleepy: " << _sleepLevel << "\n";
     }
