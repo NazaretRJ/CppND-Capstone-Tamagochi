@@ -2,31 +2,6 @@
 #include <random>
 #include "Tamagochi.h"
 
-/* Implementation of class "MessageQueue" */
-
-/*
-template <typename T>
-T MessageQueue<T>::receive()
-{
-    std::unique_lock<std::mutex> mlock(_mutex);   
-
-    _cond.wait(mlock, [this]{return !_deque.empty();});
-
-    Actions receivedMsg = std::move(_deque.front());
-    _deque.pop_front();
-
-    return receivedMsg;
-}
-
-template <typename T>
-void MessageQueue<T>::send(T &&msg)
-{ 
-    std::lock_guard<std::mutex> mlock(_mutex);
-    _deque.push_back(std::move(msg));
-    _cond.notify_one();
-}
-*/
-
 int getRandomNumber(int min = 0, int max = 30)
 {
     std::random_device rd; // Obtain a random seed from hardware
@@ -38,15 +13,14 @@ int getRandomNumber(int min = 0, int max = 30)
 
 /* Implementation of class "Tamagochi" */
 
-Tamagochi::Tamagochi(std::shared_ptr<MessageQueue<Actions>> &msgQueue):
-    _actionsQueue{msgQueue}
+Tamagochi::Tamagochi(std::shared_ptr<MessageQueue<Actions>> &msgQueue, std::mutex &accessMutex):
+    _actionsQueue{msgQueue},
+    _msgQueueAccessMutex{accessMutex}
 {
-    //readStatus();
 }
 
 Tamagochi::~Tamagochi()
 {
-    //writeStatus();
     _readThread.join();
     _simulationThread.join();
 }
@@ -61,7 +35,7 @@ void Tamagochi::updateLevels()
 {
     int prov = getRandomNumber(0,50);
 
-    std::lock_guard<std::mutex> mlock(_mutex);
+    std::lock_guard<std::mutex> mlock(_playMutex);
     if(prov % 2 == 0)
     {
         _hungerLevel += 10;
@@ -87,10 +61,32 @@ void Tamagochi::updateLevels()
 void Tamagochi::waitForAction()
 {
     Actions act;
-    bool userStops = !_canContinue;
-    while(!userStops && _actionsQueue != nullptr)
+    while(_canContinue)
     {
-        act = _actionsQueue->receive();
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        {
+            std::lock_guard<std::mutex> mlock(_msgQueueAccessMutex);
+            if(_actionsQueue == nullptr)
+            {
+                std::cout << "Error! The shared message queue is null \n";
+                _canContinue.store(false);
+                continue;
+            }
+            else{
+                if(_actionsQueue->isEmpty())
+                {
+                    continue;
+                }
+                else
+                {
+                    act = _actionsQueue->receive();
+                }
+                
+            }
+            
+        }
+        
         switch (act) {
             case Actions::eat:
             {
@@ -107,8 +103,7 @@ void Tamagochi::waitForAction()
             }
             case Actions::stop:
             {
-                userStops = true;
-                _canContinue.store(!userStops);
+                _canContinue.store(false);
                 break;
             }
         }
@@ -133,7 +128,7 @@ void Tamagochi::simulate()
             updateLevels();
             
             {
-                std::lock_guard<std::mutex> mlock(_mutex);
+                std::lock_guard<std::mutex> mlock(_playMutex);
 
                 if(_hungerLevel >= _MIN_HUNGER_LEVEL)
                 {
@@ -163,20 +158,22 @@ void Tamagochi::simulate()
 void Tamagochi::feed()
 {
     {
-        std::lock_guard<std::mutex> mlock(_mutex);
+        std::lock_guard<std::mutex> mlock(_playMutex);
 
         _hungerLevel -= _HUNGER_RESTORATION_POINTS; 
+        
+        if (_hungerLevel  < 0)
+        {
+            _hungerLevel = 0;
+        }
     }
 
     std::cout << "Eating...\n";
     std::this_thread::sleep_for(std::chrono::milliseconds(250));
     
-    std::lock_guard<std::mutex> mlock(_mutex);    
-    if (_hungerLevel  < 0)
-    {
-        _hungerLevel = 0;
-    }
-    else if(_hungerLevel >= _MIN_HUNGER_LEVEL)
+    std::lock_guard<std::mutex> mlock(_playMutex);    
+
+    if (_hungerLevel >= _MIN_HUNGER_LEVEL)
     {
         std::cout << "Your tamagochi is still hungry :( \n";
     }
@@ -190,19 +187,20 @@ void Tamagochi::play()
 void Tamagochi::nap()
 {
     {
-        std::lock_guard<std::mutex> mlock(_mutex);
+        std::lock_guard<std::mutex> mlock(_playMutex);
 
         _sleepLevel -= _SLEEP_RESTORATION_POINTS; 
+
+        if (_sleepLevel  < 0)
+        {
+            _sleepLevel = 0;
+        }
     }
     std::cout << "sleeping... \n";
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-    std::lock_guard<std::mutex> mlock(_mutex);
-    if (_sleepLevel  < 0)
-    {
-        _sleepLevel = 0;
-    }
-    else if(_sleepLevel >= _MIN_SLEEP_LEVEL)
+    std::lock_guard<std::mutex> mlock(_playMutex);
+    if (_sleepLevel >= _MIN_SLEEP_LEVEL)
     {
         std::cout << "Your tamagochi is still sleepy :( sleepy: " << _sleepLevel << "\n";
     }
