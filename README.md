@@ -56,7 +56,9 @@ The project meets the following criteria:
 
 ## Output
 When you play with your tamagochi, you will see something like:
+\
 ![playing](/images/playing.png)
+\
 You can choose any of the actions by typing the corresponding number.
 The tamagochi will say a message responding to that action.
 The tamagiochi will periodically report its status.
